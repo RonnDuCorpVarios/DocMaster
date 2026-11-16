@@ -1,0 +1,6 @@
+{
+  "appId": "com.lector.documentos",
+  "appName": "Lector",
+  "webDir": "dist",
+  "server": { "androidScheme": "https" }
+}
