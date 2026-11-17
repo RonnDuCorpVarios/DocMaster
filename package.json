@@ -1,10 +1,11 @@
 {
   "name": "docmaster",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build"
+    "build": "vite build",
+    "capacitor:sync:after": "node scripts/apply-android.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^6.1.2",

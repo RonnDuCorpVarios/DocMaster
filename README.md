@@ -14,6 +14,13 @@ Desarrollador y propietario: **RonnDu Corp**
 3. Abre la pestaña **Actions**. La compilación arranca con cada cambio, o con **Compilar APK → Run workflow** (5-8 min).
 4. Descarga el artefacto **DocMaster-APK** (un .zip con `DocMaster-vX.Y.Z.apk`) e instálalo en el teléfono.
 
+## Cómo comprobar que usas el workflow nuevo
+
+En Actions, el artefacto debe llamarse **DocMaster-APK** y el log debe incluir la línea
+`[docmaster] Icono de DocMaster aplicado`. Si el artefacto se llama `Lector-APK`, el repositorio conserva el workflow
+antiguo (la carpeta oculta `.github` no se subió). El icono se aplica igualmente gracias a `scripts/apply-android.mjs`,
+pero conviene reemplazar `.github/workflows/build-apk.yml` con el del zip.
+
 ## Versiones
 
 - La versión visible (Acerca de) sale de `"version"` en `package.json`. En cada actualización súbela
