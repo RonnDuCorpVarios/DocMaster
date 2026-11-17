@@ -24,6 +24,8 @@ jobs:
         run: npm install
 
       - name: Compilar la web
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
         run: npm run build
 
       - name: Generar proyecto Android
@@ -31,14 +33,30 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      - name: Aplicar icono, pantalla de inicio, versión y firma
+        run: node scripts/apply-android.mjs
+
       - name: Compilar APK
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
+      - name: Comprobar icono dentro del APK
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          "$BT/aapt2" dump badging "$APK" | grep -E "^package:|application-label:|application-icon" || true
+          unzip -l "$APK" | grep -i "ic_launcher" || true
+
+      - name: Nombrar APK
+        run: |
+          V=$(node -p "require('./package.json').version")
+          echo "APP_VERSION=$V" >> "$GITHUB_ENV"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "DocMaster-v$V.apk"
+
       - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
-          name: Lector-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: DocMaster-APK
+          path: DocMaster-v${{ env.APP_VERSION }}.apk
