@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Lector</title>
+<title>DocMaster</title>
 </head>
 <body>
 <div id="app">
   <header>
-    <div class="logo">L</div>
-    <div class="brand"><b>Lector</b><span id="fname">Word, Excel, PowerPoint y PDF</span></div>
+    <img class="logo logoimg" alt="">
+    <div class="brand"><b>DocMaster</b><span id="fname">All-in-One Document Reader</span></div>
     <div class="sp"></div>
     <button class="icon" id="theme" aria-label="Cambiar tema">☾</button>
   </header>
@@ -17,8 +17,9 @@
   <main id="views">
     <section class="view on" id="v-home">
       <div class="hero">
+        <img class="logoimg hero-logo" alt="DocMaster">
         <h1>Abre un documento</h1>
-        <p>Word, Excel, PowerPoint o PDF. Se abre en tu teléfono, sin enviar nada a internet.</p>
+        <p>Word, Excel, PowerPoint, PDF o TXT. Se abre en tu teléfono, sin enviar nada a internet.</p>
         <label class="btn primary big" for="file">Elegir archivo</label>
         <input id="file" type="file" hidden>
       </div>
@@ -54,11 +55,28 @@
       <input id="hq" class="field" type="search" placeholder="Buscar por nombre…" autocomplete="off">
       <div class="list" id="hlist"></div>
     </section>
+
+    <section class="view" id="v-about">
+      <div class="about">
+        <img class="logoimg about-logo" alt="DocMaster">
+        <h1>DocMaster</h1>
+        <p class="tag">All-in-One Document Reader</p>
+        <div class="rows">
+          <div class="row"><span>Aplicación</span><b>DocMaster</b></div>
+          <div class="row"><span>Versión</span><b id="ab-ver"></b></div>
+          <div class="row"><span>Compilación</span><b id="ab-build"></b></div>
+          <div class="row"><span>Desarrollador y propietario</span><b>RonnDu Corp</b></div>
+          <div class="row"><span>Formatos</span><b>Word, Excel, PowerPoint, PDF y TXT</b></div>
+        </div>
+        <p class="note">© 2026 RonnDu Corp. Todos los derechos reservados. Tus archivos se procesan en el dispositivo y no se envían a internet.</p>
+      </div>
+    </section>
   </main>
 
   <nav>
     <button id="n-read" class="on"><span>▤</span>Lector</button>
     <button id="n-hist"><span>◷</span>Historial</button>
+    <button id="n-about"><span>ⓘ</span>Acerca de</button>
   </nav>
   <div id="toast"></div>
 </div>

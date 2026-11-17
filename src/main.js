@@ -1,4 +1,5 @@
 import './style.css';
+import logo from './logo.png';
 import mammoth from 'mammoth/mammoth.browser.min.js';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
@@ -15,8 +16,12 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const fold = s => s.replace(/[\u00C0-\u024F]/g, c => c.normalize('NFD')[0]).toLowerCase();
 const fsize = b => b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(1) + ' KB' : (b / 1048576).toFixed(1) + ' MB';
 const MAXHITS = 2000, MAX_ITEMS = 40, MAX_STORE = 30 * 1048576;
-const KINDS = { docx: 'WORD', xlsx: 'EXCEL', xls: 'EXCEL', csv: 'EXCEL', pptx: 'POWERPOINT', pdf: 'PDF' };
-const ICON = { WORD: 'W', EXCEL: 'X', POWERPOINT: 'P', PDF: 'PDF' };
+const KINDS = { docx: 'WORD', xlsx: 'EXCEL', xls: 'EXCEL', csv: 'EXCEL', pptx: 'POWERPOINT', pdf: 'PDF', txt: 'TXT' };
+const ICON = { WORD: 'W', EXCEL: 'X', POWERPOINT: 'P', PDF: 'PDF', TXT: 'TXT' };
+const TAG = 'All-in-One Document Reader';
+document.querySelectorAll('.logoimg').forEach(i => { i.src = logo; });
+$('#ab-ver').textContent = __APP_VERSION__;
+$('#ab-build').textContent = __APP_BUILD__;
 
 const state = { kind: null, view: 'home', pdf: null, sheets: null };
 let query = '', hits = [], cur = -1, stoken = 0, ttimer;
@@ -32,7 +37,7 @@ const isDark = () => root.dataset.theme ? root.dataset.theme === 'dark' : matchM
 function paintTheme() {
   $('#theme').textContent = isDark() ? '☀' : '☾';
   if (Capacitor.isNativePlatform()) {
-    StatusBar.setBackgroundColor({ color: isDark() ? '#171a1f' : '#ffffff' }).catch(() => {});
+    StatusBar.setBackgroundColor({ color: isDark() ? '#101c31' : '#ffffff' }).catch(() => {});
     StatusBar.setStyle({ style: isDark() ? Style.Dark : Style.Light }).catch(() => {});
   }
 }
@@ -47,15 +52,17 @@ $('#theme').onclick = () => {
 /* ---------- Vistas ---------- */
 function showView(v) {
   state.view = v;
-  ['home', 'doc', 'hist'].forEach(n => $('#v-' + n).classList.toggle('on', n === v));
-  $('#n-read').classList.toggle('on', v !== 'hist');
+  ['home', 'doc', 'hist', 'about'].forEach(n => $('#v-' + n).classList.toggle('on', n === v));
+  $('#n-read').classList.toggle('on', v === 'home' || v === 'doc');
   $('#n-hist').classList.toggle('on', v === 'hist');
+  $('#n-about').classList.toggle('on', v === 'about');
   $('#views').scrollTop = 0;
   if (v === 'hist') renderHist();
   if (v === 'home') renderRecent();
 }
 $('#n-read').onclick = () => showView(state.kind ? 'doc' : 'home');
 $('#n-hist').onclick = () => showView('hist');
+$('#n-about').onclick = () => showView('about');
 $('#seeall').onclick = () => showView('hist');
 $('#close').onclick = closeDoc;
 
@@ -64,7 +71,7 @@ function closeDoc() {
   if (state.pdf && state.pdf.obs) state.pdf.obs.disconnect();
   state.pdf = null; state.sheets = null; state.kind = null;
   $('#out').innerHTML = ''; $('#tools').innerHTML = '';
-  $('#fname').textContent = 'Word, Excel, PowerPoint y PDF';
+  $('#fname').textContent = TAG;
   showView('home');
 }
 
@@ -148,7 +155,7 @@ $('#file').onchange = e => { const f = e.target.files[0]; e.target.value = ''; i
 
 async function openFile(f, id) {
   const ext = f.name.split('.').pop().toLowerCase(), kind = KINDS[ext];
-  if (!kind) { toast('Formato no compatible. Usa .docx, .xlsx, .pptx o .pdf (los .doc y .ppt antiguos hay que guardarlos como .docx y .pptx).'); return; }
+  if (!kind) { toast('Formato no compatible. Usa .docx, .xlsx, .pptx, .pdf o .txt (los .doc y .ppt antiguos hay que guardarlos como .docx y .pptx).'); return; }
   closeSearch(); stoken++;
   if (state.pdf && state.pdf.obs) state.pdf.obs.disconnect();
   state.pdf = null; state.sheets = null; state.kind = kind;
@@ -160,7 +167,7 @@ async function openFile(f, id) {
   showView('doc');
   try {
     const buf = await f.arrayBuffer();
-    await ({ WORD: docx, EXCEL: sheets, POWERPOINT: pptx, PDF: pdf })[kind](buf);
+    await ({ WORD: docx, EXCEL: sheets, POWERPOINT: pptx, PDF: pdf, TXT: txt })[kind](buf);
     $('#load').hidden = true;
     addHistory(f, kind, buf, id).catch(() => {});
   } catch (e) {
@@ -174,6 +181,12 @@ async function docx(buf) {
   const r = await mammoth.convertToHtml({ arrayBuffer: buf });
   $('#out').innerHTML = '<article class="doc">' + (r.value || '<p>El documento está vacío.</p>') + '</article>'
     + (r.messages.length ? '<p class="note">Algunos elementos de formato avanzado pueden no mostrarse.</p>' : '');
+}
+
+/* ---------- TXT ---------- */
+async function txt(buf) {
+  const text = new TextDecoder('utf-8').decode(buf);
+  $('#out').innerHTML = '<article class="doc"><pre>' + esc(text || 'El archivo está vacío.') + '</pre></article>';
 }
 
 /* ---------- Excel ---------- */
@@ -388,7 +401,7 @@ $('#sbtn').onclick = () => {
 try {
   CapApp.addListener('backButton', () => {
     if (!$('#sbar').hidden) { closeSearch(); $('#sq').value = ''; return; }
-    if (state.view === 'hist') { showView(state.kind ? 'doc' : 'home'); return; }
+    if (state.view === 'hist' || state.view === 'about') { showView(state.kind ? 'doc' : 'home'); return; }
     if (state.view === 'doc') { closeDoc(); return; }
     CapApp.exitApp();
   });

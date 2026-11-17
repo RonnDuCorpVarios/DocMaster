@@ -1,6 +1,6 @@
 {
-  "appId": "com.lector.documentos",
-  "appName": "Lector",
+  "appId": "com.ronndu.docmaster",
+  "appName": "DocMaster",
   "webDir": "dist",
   "server": { "androidScheme": "https" }
 }

@@ -1,20 +1,29 @@
-# Lector (app Android)
+# DocMaster – All-in-One Document Reader
 
-Lector de Word, Excel, PowerPoint y PDF con modo claro/oscuro, historial de archivos abiertos y buscador de palabras.
+Lector de Word, Excel, PowerPoint, PDF y TXT con modo claro/oscuro, historial de archivos abiertos,
+buscador de palabras y pestaña «Acerca de».
+
+Desarrollador y propietario: **RonnDu Corp**
 
 ## Cómo compilar el APK sin instalar nada
 
 1. En github.com crea un repositorio nuevo (puede ser privado).
 2. Sube TODO el contenido de esta carpeta al repositorio (Add file → Upload files).
-   - Debe quedar la carpeta `.github/workflows/build-apk.yml`. Si tu navegador no sube carpetas ocultas,
+   - Debe quedar `.github/workflows/build-apk.yml`. Si tu navegador no sube carpetas ocultas,
      crea el archivo a mano: Add file → Create new file, escribe `.github/workflows/build-apk.yml` como nombre y pega su contenido.
-3. Entra en la pestaña **Actions**. La compilación arranca sola con cada cambio; también puedes lanzarla con
-   **Compilar APK → Run workflow**. Tarda unos 5-8 minutos.
-4. Al terminar, abre la ejecución y descarga el artefacto **Lector-APK** (un .zip con `app-debug.apk`).
-5. Descomprime e instala el APK en el teléfono (permite instalar apps de origen desconocido).
+3. Abre la pestaña **Actions**. La compilación arranca con cada cambio, o con **Compilar APK → Run workflow** (5-8 min).
+4. Descarga el artefacto **DocMaster-APK** (un .zip con `DocMaster-vX.Y.Z.apk`) e instálalo en el teléfono.
+
+## Versiones
+
+- La versión visible (Acerca de) sale de `"version"` en `package.json`. En cada actualización súbela
+  (1.0.0 → 1.0.1 → 1.1.0…).
+- El número de compilación (`versionCode` de Android) sube solo con cada ejecución de GitHub Actions, así que
+  Android siempre acepta instalar la nueva compilación encima de la anterior.
+- Todas las compilaciones se firman con la misma clave (`resources/debug.keystore`), así que cada APK nuevo
+  se instala encima del anterior sin perder datos ni historial.
 
 ## Notas
 
-- El APK es de depuración (debug): sirve para instalar y usar, pero no para publicar en Google Play.
-- El historial guarda una copia de cada archivo (hasta 30 MB por archivo y 40 archivos) para poder reabrirlo sin buscarlo.
-- Para cambiar el nombre o el id de la app edita `capacitor.config.json` (`appName`, `appId`).
+- El APK es de depuración: sirve para instalar y usar, no para publicar en Google Play.
+- El logo original está en `resources/logo-original.jpg`; los iconos de Android ya están generados en `resources/android/res`.
