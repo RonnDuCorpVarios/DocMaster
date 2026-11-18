@@ -38,6 +38,51 @@ for (const d of ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
 const xml = path.join(res, 'mipmap-anydpi-v26/ic_launcher.xml');
 if (!fs.readFileSync(xml, 'utf8').includes('ic_launcher_bg')) throw new Error(tag + ' El icono adaptable no es el de DocMaster');
 
+// 3b. "Abrir con": plugin nativo + MainActivity + filtros de intent en el manifiesto
+const cfg = JSON.parse(fs.readFileSync(path.join(root, 'capacitor.config.json'), 'utf8'));
+const javaDir = path.join(root, 'android/app/src/main/java', ...cfg.appId.split('.'));
+fs.mkdirSync(javaDir, { recursive: true });
+for (const f of ['MainActivity.java', 'IncomingFilePlugin.java']) {
+  const src = fs.readFileSync(path.join(root, 'resources/android/java', f), 'utf8').split('__APP_ID__').join(cfg.appId);
+  fs.writeFileSync(path.join(javaDir, f), src);
+}
+const mimes = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-excel', 'text/plain', 'text/csv', 'text/comma-separated-values'
+];
+const exts = ['docx', 'xlsx', 'xls', 'pptx', 'pdf', 'txt', 'csv'];
+const bs = '\\\\'; // dos barras invertidas, como exige el XML del manifiesto
+const head = '<action android:name="android.intent.action.VIEW"/>\n            <category android:name="android.intent.category.DEFAULT"/>\n            <category android:name="android.intent.category.BROWSABLE"/>';
+const pathData = exts.flatMap(e => ['.*', '.*' + bs + '..*', '.*' + bs + '..*' + bs + '..*']
+  .map(p => '<data android:pathPattern="' + p + bs + '.' + e + '"/>')).join('\n            ');
+const filters = `
+        <!-- docmaster-open-with -->
+        <intent-filter>
+            ${head}
+            <data android:scheme="content"/>
+            <data android:scheme="file"/>
+            ${mimes.map(m => '<data android:mimeType="' + m + '"/>').join('\n            ')}
+        </intent-filter>
+        <intent-filter>
+            ${head}
+            <data android:scheme="content"/>
+            <data android:host="*"/>
+            <data android:mimeType="*/*"/>
+            ${pathData}
+        </intent-filter>
+`;
+const mf = path.join(root, 'android/app/src/main/AndroidManifest.xml');
+let man = fs.readFileSync(mf, 'utf8');
+if (!man.includes('docmaster-open-with')) {
+  if (!man.includes('</activity>')) throw new Error(tag + ' No se encontró la actividad en el manifiesto');
+  man = man.replace('</activity>', filters + '        </activity>');
+  fs.writeFileSync(mf, man);
+}
+if (!fs.readFileSync(mf, 'utf8').includes('android.intent.action.VIEW')) throw new Error(tag + ' No se pudo añadir "Abrir con"');
+
 // 4. Versión (versionName desde package.json, versionCode = nº de ejecución de Actions)
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const gradle = path.join(root, 'android/app/build.gradle');

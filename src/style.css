@@ -36,7 +36,7 @@ button:active,.btn:active{transform:scale(.97)}
 .icon{width:40px;height:40px;padding:0;font-size:18px}
 .link{border:0;background:none;color:var(--accent);padding:6px 4px;font-weight:600}
 button:disabled{opacity:.35}
-#views{flex:1;overflow:auto;position:relative}
+#views{flex:1;overflow:auto;position:relative;touch-action:pan-x pan-y}
 .view{display:none;max-width:980px;margin:0 auto;padding:0 16px 24px}
 .view.on{display:block}
 .hero{margin:26px 0 30px;padding:34px 22px;border:1px solid var(--line);border-radius:22px;background:var(--surface);text-align:center;box-shadow:var(--shadow)}
@@ -83,8 +83,8 @@ button:disabled{opacity:.35}
 .tab.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
 .tab i{font-style:normal;margin-left:6px;background:var(--accent);color:var(--on-accent);border-radius:99px;padding:0 7px;font-size:11px}
 .sheet{overflow:auto;max-height:calc(100dvh - 270px);border:1px solid var(--line);border-radius:14px;background:var(--surface)}
-.sheet table{border-collapse:separate;border-spacing:0;font-size:13.5px;width:max-content;min-width:100%}
-.sheet th,.sheet td{padding:7px 12px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);white-space:nowrap;max-width:300px;overflow:hidden;text-overflow:ellipsis}
+.sheet table{border-collapse:separate;border-spacing:0;font-size:calc(13.5px * var(--zx,1));width:max-content;min-width:100%}
+.sheet th,.sheet td{padding:.52em .9em;border-bottom:1px solid var(--line);border-right:1px solid var(--line);white-space:nowrap;max-width:22em;overflow:hidden;text-overflow:ellipsis}
 .sheet thead th{position:sticky;top:0;background:var(--surface2);color:var(--muted);font-weight:600;z-index:2}
 .sheet tbody th{position:sticky;left:0;background:var(--surface2);color:var(--muted);font-weight:500;text-align:center}
 .slides{display:grid;gap:18px}

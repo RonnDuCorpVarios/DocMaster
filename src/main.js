@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.js?url';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
 
@@ -23,7 +23,7 @@ document.querySelectorAll('.logoimg').forEach(i => { i.src = logo; });
 $('#ab-ver').textContent = __APP_VERSION__;
 $('#ab-build').textContent = __APP_BUILD__;
 
-const state = { kind: null, view: 'home', pdf: null, sheets: null };
+const state = { kind: null, view: 'home', pdf: null, sheets: null, zoom: 1 };
 let query = '', hits = [], cur = -1, stoken = 0, ttimer;
 
 function toast(msg) {
@@ -159,7 +159,8 @@ async function openFile(f, id) {
   closeSearch(); stoken++;
   if (state.pdf && state.pdf.obs) state.pdf.obs.disconnect();
   state.pdf = null; state.sheets = null; state.kind = kind;
-  $('#out').innerHTML = ''; $('#tools').innerHTML = '';
+  $('#out').innerHTML = ''; resetZoom();
+  $('#tools').innerHTML = '<button class="icon" id="zo" aria-label="Alejar">−</button> <button class="icon" id="zi" aria-label="Acercar">+</button>';
   $('#sq').value = ''; query = '';
   $('#badge').textContent = kind; $('#meta').textContent = fsize(f.size);
   $('#fname').textContent = f.name;
@@ -261,16 +262,13 @@ async function pdf(buf) {
   const P = state.pdf = { doc, pages: [], vps: [], txt: {}, zoom: 1, obs: null };
   for (let n = 1; n <= doc.numPages; n++) { const pg = await doc.getPage(n); P.pages.push(pg); P.vps.push(pg.getViewport({ scale: 1 })); }
   $('#meta').textContent += ', ' + doc.numPages + (doc.numPages === 1 ? ' página' : ' páginas');
-  $('#tools').innerHTML = '<button class="icon" id="zo" aria-label="Reducir">−</button> <button class="icon" id="zi" aria-label="Ampliar">+</button>';
-  $('#zo').onclick = () => { P.zoom = Math.max(.6, P.zoom - .3); layoutPdf(); };
-  $('#zi').onclick = () => { P.zoom = Math.min(3, P.zoom + .3); layoutPdf(); };
   layoutPdf();
 }
 function layoutPdf() {
   const P = state.pdf; if (!P) return;
   if (P.obs) P.obs.disconnect();
   $('#out').innerHTML = '<div class="pages" id="pages"></div>';
-  const box = $('#pages'), W = Math.max(260, $('#out').clientWidth) * P.zoom;
+  const box = $('#pages'); P.baseW = Math.max(260, $('#out').clientWidth); const W = P.baseW * P.zoom;
   P.obs = new IntersectionObserver(es => es.forEach(e => {
     const n = +e.target.dataset.n;
     if (e.isIntersecting) drawPage(n);
@@ -288,15 +286,16 @@ async function drawPage(n) {
   const d = document.querySelector('#pages .pw[data-n="' + n + '"]');
   if (!d || d.dataset.z === String(P.zoom) || d.dataset.busy) return;
   d.dataset.busy = 1;
-  const vp = P.vps[n - 1], dpr = Math.min(devicePixelRatio || 1, 2);
+  const zNow = P.zoom, vp = P.vps[n - 1], dpr = Math.min(devicePixelRatio || 1, 2);
   const sc = Math.min(d.clientWidth * dpr / vp.width, 4096 / vp.width);
   const v = P.pages[n - 1].getViewport({ scale: sc });
   const c = document.createElement('canvas'); c.width = v.width; c.height = v.height;
   try {
     await P.pages[n - 1].render({ canvasContext: c.getContext('2d'), viewport: v }).promise;
-    if (d.isConnected) { const old = d.querySelector('canvas'); if (old) old.remove(); d.prepend(c); d.dataset.z = P.zoom; }
+    if (d.isConnected) { const old = d.querySelector('canvas'); if (old) old.remove(); d.prepend(c); d.dataset.z = zNow; }
   } catch (e) {}
   delete d.dataset.busy;
+  if (state.pdf === P && P.zoom !== zNow && d.isConnected) drawPage(n);
 }
 async function pageItems(n) {
   const P = state.pdf; if (P.txt[n]) return P.txt[n];
@@ -406,5 +405,99 @@ try {
     CapApp.exitApp();
   });
 } catch (e) {}
+
+/* ---------- Zoom con los dedos (pellizcar) y botones + / − ---------- */
+const MINZ = .5, MAXZ = 4;
+const curZoom = () => state.kind === 'PDF' && state.pdf ? state.pdf.zoom : state.zoom;
+function resetZoom() {
+  state.zoom = 1;
+  const o = $('#out'); o.style.transform = ''; o.style.width = ''; o.style.removeProperty('--zx');
+}
+function setPdfZoom(z, fx, fy) {
+  const P = state.pdf, pg = $('#pages'); if (!P || !pg) return;
+  const ratio = z / P.zoom, r = pg.getBoundingClientRect(), sc = $('#views');
+  const cx = fx - r.left, cy = fy - r.top;
+  pg.querySelectorAll('.pw').forEach(b => { b.style.width = (P.baseW * z) + 'px'; });
+  P.zoom = z;
+  sc.scrollTop += cy * (ratio - 1);
+  pg.scrollLeft = (pg.scrollLeft + cx) * ratio - cx;
+}
+function refreshPdf() {
+  document.querySelectorAll('#pages .pw').forEach(b => {
+    delete b.dataset.z;
+    const r = b.getBoundingClientRect();
+    if (r.bottom > -800 && r.top < innerHeight + 800) drawPage(+b.dataset.n);
+  });
+}
+function setZoom(z, fx, fy) {
+  z = Math.min(MAXZ, Math.max(MINZ, z));
+  if (!state.kind) return;
+  if (state.kind === 'PDF') { setPdfZoom(z, fx, fy); return; }
+  const z0 = state.zoom, ratio = z / z0, o = $('#out');
+  state.zoom = z;
+  if (state.kind === 'EXCEL') {
+    const sc = document.querySelector('#grid .sheet'), r = sc && sc.getBoundingClientRect();
+    o.style.setProperty('--zx', z);
+    if (sc) {
+      const px = fx - r.left, py = fy - r.top;
+      sc.scrollLeft = (sc.scrollLeft + px) * ratio - px; sc.scrollTop = (sc.scrollTop + py) * ratio - py;
+    }
+    return;
+  }
+  const r = o.getBoundingClientRect(), cx = (fx - r.left) / z0, cy = (fy - r.top) / z0;
+  o.style.transformOrigin = '0 0';
+  o.style.transform = z === 1 ? '' : 'scale(' + z + ')';
+  o.style.width = z === 1 ? '' : (100 / z) + '%';
+  const r2 = o.getBoundingClientRect(), sc = $('#views');
+  sc.scrollTop += (r2.top + cy * z) - fy; sc.scrollLeft += (r2.left + cx * z) - fx;
+}
+$('#tools').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  setZoom(curZoom() * (b.id === 'zi' ? 1.25 : 1 / 1.25), innerWidth / 2, innerHeight / 2);
+  if (state.kind === 'PDF') refreshPdf();
+});
+let pin = null, praf = 0;
+const tdist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+function endPinch() { if (!pin) return; pin = null; if (state.kind === 'PDF') refreshPdf(); }
+const viewsEl = $('#views');
+viewsEl.addEventListener('touchstart', e => {
+  if (state.view === 'doc' && state.kind && e.touches.length === 2) pin = { d: tdist(e.touches), z: curZoom(), zz: curZoom(), fx: 0, fy: 0 };
+  else if (pin && e.touches.length !== 2) endPinch();
+}, { passive: true });
+viewsEl.addEventListener('touchmove', e => {
+  if (!pin || e.touches.length !== 2) return;
+  if (e.cancelable) e.preventDefault();
+  const t = e.touches;
+  pin.fx = (t[0].clientX + t[1].clientX) / 2; pin.fy = (t[0].clientY + t[1].clientY) / 2;
+  pin.zz = pin.z * tdist(t) / pin.d;
+  if (!praf) praf = requestAnimationFrame(() => { praf = 0; if (pin) setZoom(pin.zz, pin.fx, pin.fy); });
+}, { passive: false });
+viewsEl.addEventListener('touchend', e => { if (pin && e.touches.length < 2) endPinch(); });
+viewsEl.addEventListener('touchcancel', endPinch);
+
+/* ---------- Archivos recibidos desde "Abrir con" de otras apps ---------- */
+const Incoming = registerPlugin('IncomingFile');
+async function checkIncoming() {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    const r = await Incoming.getPending();
+    if (r.error) { toast('No se pudo abrir el archivo recibido.'); return; }
+    if (!r.path) return;
+    let blob;
+    try {
+      const res = await fetch(Capacitor.convertFileSrc(r.path));
+      if (!res.ok) throw new Error('fetch');
+      blob = await res.blob();
+    } catch (e) {
+      const b = await Incoming.readBase64({ path: r.path });
+      const bin = atob(b.data), u = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+      blob = new Blob([u]);
+    }
+    openFile(new File([blob], r.name, { lastModified: 0 }));
+  } catch (e) { console.error(e); toast('No se pudo abrir el archivo recibido.'); }
+}
+try { Incoming.addListener('fileOpened', checkIncoming); } catch (e) {}
+checkIncoming();
 
 renderRecent();

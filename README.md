@@ -14,6 +14,11 @@ Desarrollador y propietario: **RonnDu Corp**
 3. Abre la pestaña **Actions**. La compilación arranca con cada cambio, o con **Compilar APK → Run workflow** (5-8 min).
 4. Descarga el artefacto **DocMaster-APK** (un .zip con `DocMaster-vX.Y.Z.apk`) e instálalo en el teléfono.
 
+## Abrir desde otras apps
+
+DocMaster aparece en «Abrir con» al tocar un .docx, .xlsx, .xls, .pptx, .pdf, .txt o .csv desde el gestor de archivos,
+WhatsApp, Gmail, etc. Para que el teléfono lo use siempre, elige «Siempre» en ese diálogo.
+
 ## Cómo comprobar que usas el workflow nuevo
 
 En Actions, el artefacto debe llamarse **DocMaster-APK** y el log debe incluir la línea
