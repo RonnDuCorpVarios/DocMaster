@@ -23,8 +23,16 @@ document.querySelectorAll('.logoimg').forEach(i => { i.src = logo; });
 $('#ab-ver').textContent = __APP_VERSION__;
 $('#ab-build').textContent = __APP_BUILD__;
 
-const state = { kind: null, view: 'home', pdf: null, sheets: null, zoom: 1 };
+const state = { kind: null, view: 'home', pdf: null, sheets: null, zoom: 1, docId: null, currentPage: 1, progress: 0 };
 let query = '', hits = [], cur = -1, stoken = 0, ttimer;
+const readJSON = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch (e) { return fallback; } };
+const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { toast('No hay espacio para guardar los cambios.'); } };
+const getDocId = f => [f.name, f.size, f.lastModified || 0].join('|');
+const getFavorites = () => readJSON('docmaster-favorites', []);
+const getMarks = () => readJSON('docmaster-bookmarks', {});
+const getProgress = () => readJSON('docmaster-progress', {});
+const getExcerpts = () => readJSON('docmaster-excerpts', []);
+let progressTimer;
 
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
@@ -58,7 +66,7 @@ function showView(v) {
   $('#n-about').classList.toggle('on', v === 'about');
   $('#views').scrollTop = 0;
   if (v === 'hist') renderHist();
-  if (v === 'home') renderRecent();
+  if (v === 'home') { renderRecent(); renderFavorites(); }
 }
 $('#n-read').onclick = () => showView(state.kind ? 'doc' : 'home');
 $('#n-hist').onclick = () => showView('hist');
@@ -69,8 +77,9 @@ $('#close').onclick = closeDoc;
 function closeDoc() {
   closeSearch(); stoken++;
   if (state.pdf && state.pdf.obs) state.pdf.obs.disconnect();
-  state.pdf = null; state.sheets = null; state.kind = null;
+  saveReadingProgress(); state.pdf = null; state.sheets = null; state.kind = null; state.docId = null; state.currentFile = null;
   $('#out').innerHTML = ''; $('#tools').innerHTML = '';
+  $('#doc-actions').hidden = true; $('#progress-wrap').hidden = true;
   $('#fname').textContent = TAG;
   showView('home');
 }
@@ -113,6 +122,7 @@ function listHtml(items) {
   return items.map(e => `<div class="item" role="button" tabindex="0" data-id="${esc(e.id)}">
     <div class="ico k-${e.kind}">${ICON[e.kind]}</div>
     <div class="t"><b>${esc(e.name)}</b><small>${fsize(e.size)}, ${ago(e.t)}</small></div>
+    <button class="fav-toggle" data-fav="${esc(e.id)}" aria-label="${getFavorites().includes(e.id) ? 'Quitar de' : 'Añadir a'} favoritos">${getFavorites().includes(e.id) ? '★' : '☆'}</button>
     <button class="del" data-del="${esc(e.id)}" aria-label="Quitar del historial">✕</button></div>`).join('');
 }
 function renderRecent() {
@@ -120,12 +130,20 @@ function renderRecent() {
   $('#recent-wrap').hidden = !h.length;
   $('#recent').innerHTML = listHtml(h);
 }
+function renderFavorites() {
+  const ids = getFavorites(), items = loadH().filter(e => ids.includes(e.id));
+  $('#favorite-wrap').hidden = !items.length;
+  $('#favorites').innerHTML = listHtml(items.slice(0, 4));
+}
+let libraryMode = 'history';
 function renderHist() {
   const q = fold($('#hq').value.trim());
-  const all = loadH(), h = all.filter(e => !q || fold(e.name).includes(q));
-  $('#clearh').hidden = !all.length;
+  const all = loadH(), source = libraryMode === 'favorites' ? all.filter(e => getFavorites().includes(e.id)) : all;
+  const h = source.filter(e => !q || fold(e.name).includes(q));
+  $('#history-title').textContent = libraryMode === 'favorites' ? 'Favoritos' : 'Historial';
+  $('#clearh').hidden = libraryMode === 'favorites' || !all.length;
   $('#hlist').innerHTML = h.length ? listHtml(h)
-    : `<div class="empty">${all.length ? 'Ningún archivo coincide con tu búsqueda.' : 'Aún no has abierto archivos. Los que abras aparecerán aquí para volver a abrirlos.'}</div>`;
+    : `<div class="empty">${libraryMode === 'favorites' ? 'Todavía no tienes documentos favoritos.' : all.length ? 'Ningún archivo coincide con tu búsqueda.' : 'Aún no has abierto archivos. Los que abras aparecerán aquí para volver a abrirlos.'}</div>`;
 }
 async function reopen(id) {
   const e = loadH().find(x => x.id === id); if (!e) return;
@@ -135,19 +153,30 @@ async function reopen(id) {
   openFile(new File([blob], e.name, { type: blob.type }), id);
 }
 function histClick(ev) {
+  const fav = ev.target.closest('[data-fav]');
+  if (fav) {
+    ev.stopPropagation(); const id = fav.dataset.fav, ids = getFavorites();
+    writeJSON('docmaster-favorites', ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
+    syncDocButtons(); renderHist(); renderRecent(); renderFavorites(); return;
+  }
   const del = ev.target.closest('[data-del]');
   if (del) {
     ev.stopPropagation(); const id = del.dataset.del;
     saveH(loadH().filter(e => e.id !== id)); blobOp('readwrite', s => s.delete(id)).catch(() => {});
-    renderHist(); renderRecent(); return;
+    writeJSON('docmaster-favorites', getFavorites().filter(x => x !== id));
+    renderHist(); renderRecent(); renderFavorites(); return;
   }
   const it = ev.target.closest('.item'); if (it) reopen(it.dataset.id);
 }
 $('#hlist').onclick = histClick; $('#recent').onclick = histClick;
+$('#favorites').onclick = histClick;
 $('#hq').oninput = renderHist;
+$('#show-history').onclick = () => { libraryMode = 'history'; renderHist(); };
+$('#show-favorites').onclick = () => { libraryMode = 'favorites'; renderHist(); };
+$('#seefav').onclick = () => { libraryMode = 'favorites'; $('#hq').value = ''; showView('hist'); };
 $('#clearh').onclick = () => {
   if (!confirm('¿Borrar todo el historial? También se eliminan las copias guardadas.')) return;
-  saveH([]); blobOp('readwrite', s => s.clear()).catch(() => {}); renderHist();
+  saveH([]); writeJSON('docmaster-favorites', []); blobOp('readwrite', s => s.clear()).catch(() => {}); renderHist(); renderRecent(); renderFavorites();
 };
 
 /* ---------- Abrir archivos ---------- */
@@ -156,11 +185,13 @@ $('#file').onchange = e => { const f = e.target.files[0]; e.target.value = ''; i
 async function openFile(f, id) {
   const ext = f.name.split('.').pop().toLowerCase(), kind = KINDS[ext];
   if (!kind) { toast('Formato no compatible. Usa .docx, .xlsx, .pptx, .pdf o .txt (los .doc y .ppt antiguos hay que guardarlos como .docx y .pptx).'); return; }
+  saveReadingProgress();
   closeSearch(); stoken++;
   if (state.pdf && state.pdf.obs) state.pdf.obs.disconnect();
-  state.pdf = null; state.sheets = null; state.kind = kind;
+  state.pdf = null; state.sheets = null; state.kind = kind; state.docId = id || getDocId(f); state.currentPage = 1; state.progress = 0; state.currentFile = f;
   $('#out').innerHTML = ''; resetZoom();
   $('#tools').innerHTML = '<button class="icon" id="zo" aria-label="Alejar">−</button> <button class="icon" id="zi" aria-label="Acercar">+</button>';
+  $('#doc-actions').hidden = false; $('#progress-wrap').hidden = false; syncDocButtons(); applyReaderPreferences();
   $('#sq').value = ''; query = '';
   $('#badge').textContent = kind; $('#meta').textContent = fsize(f.size);
   $('#fname').textContent = f.name;
@@ -170,12 +201,142 @@ async function openFile(f, id) {
     const buf = await f.arrayBuffer();
     await ({ WORD: docx, EXCEL: sheets, POWERPOINT: pptx, PDF: pdf, TXT: txt })[kind](buf);
     $('#load').hidden = true;
+    restoreReadingPosition(); updateProgress();
     addHistory(f, kind, buf, id).catch(() => {});
+    renderRecent(); renderFavorites();
   } catch (e) {
     console.error(e); $('#load').hidden = true;
     $('#out').innerHTML = '<div class="err">No se pudo abrir el archivo: ' + esc(e.message || e) + '</div>';
   }
 }
+
+/* ---------- Biblioteca personal y herramientas de lectura ---------- */
+function syncDocButtons() {
+  if (!state.docId) return;
+  const fav = getFavorites().includes(state.docId);
+  $('#favorite-btn').innerHTML = (fav ? '★' : '☆') + ' <span>' + (fav ? 'Favorito' : 'Favorito') + '</span>';
+  const marks = getMarks()[state.docId] || [];
+  const markKey = state.kind === 'PDF' ? state.currentPage : Math.round(state.progress || 0);
+  const hasMark = marks.some(m => m.page === markKey);
+  $('#bookmark-btn').innerHTML = (hasMark ? '◆' : '◇') + ' <span>Marcador</span>';
+}
+function saveReadingProgress() {
+  if (!state.docId || !state.kind) return;
+  const data = getProgress();
+  data[state.docId] = { percent: state.progress || 0, page: state.currentPage || 1, updated: Date.now() };
+  writeJSON('docmaster-progress', data);
+}
+function updateProgress() {
+  if (!state.kind) return;
+  let percent = 0;
+  if (state.kind === 'PDF' && state.pdf) percent = state.pdf.doc.numPages ? state.currentPage / state.pdf.doc.numPages * 100 : 0;
+  else {
+    const el = $('#views'), max = el.scrollHeight - el.clientHeight;
+    percent = max > 0 ? el.scrollTop / max * 100 : 100;
+  }
+  state.progress = Math.max(0, Math.min(100, Math.round(percent)));
+  $('#progress-fill').style.width = state.progress + '%';
+  $('#progress-label').textContent = state.kind === 'PDF' && state.pdf
+    ? 'Página ' + state.currentPage + ' de ' + state.pdf.doc.numPages + ' · ' + state.progress + '%'
+    : state.progress + '% leído';
+  clearTimeout(progressTimer); progressTimer = setTimeout(saveReadingProgress, 450);
+  syncDocButtons();
+}
+function restoreReadingPosition() {
+  if (!state.docId) return;
+  const saved = getProgress()[state.docId]; if (!saved) return;
+  state.currentPage = Math.max(1, saved.page || 1); state.progress = saved.percent || 0;
+  requestAnimationFrame(() => {
+    if (state.kind === 'PDF') {
+      const target = document.querySelector('#pages .pw[data-n="' + state.currentPage + '"]');
+      if (target) target.scrollIntoView({ block: 'start' });
+    } else if (saved.percent > 0) {
+      const el = $('#views'), max = el.scrollHeight - el.clientHeight;
+      el.scrollTop = max * saved.percent / 100;
+    }
+    updateProgress();
+  });
+}
+function addBookmark() {
+  if (!state.docId) return;
+  const all = getMarks(), list = all[state.docId] || [];
+  const markKey = state.kind === 'PDF' ? state.currentPage : Math.round(state.progress || 0);
+  const index = list.findIndex(m => m.page === markKey);
+  if (index >= 0) list.splice(index, 1);
+  else list.push({ page: markKey, label: state.kind === 'PDF' ? 'Página ' + state.currentPage : 'Posición ' + (state.progress || 0) + '%', created: Date.now(), percent: state.progress });
+  all[state.docId] = list; writeJSON('docmaster-bookmarks', all); syncDocButtons();
+  toast(index >= 0 ? 'Marcador eliminado.' : 'Marcador guardado.');
+}
+function toggleFavoriteCurrent() {
+  if (!state.docId) return;
+  const ids = getFavorites(), next = ids.includes(state.docId) ? ids.filter(x => x !== state.docId) : [...ids, state.docId];
+  writeJSON('docmaster-favorites', next); syncDocButtons(); renderFavorites(); renderHist();
+  toast(next.includes(state.docId) ? 'Añadido a favoritos.' : 'Quitado de favoritos.');
+}
+async function shareCurrentFile() {
+  const f = state.currentFile; if (!f) return;
+  try {
+    if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [f] }))) {
+      await navigator.share({ title: f.name, files: [f] });
+    } else toast('Este dispositivo no permite compartir archivos directamente desde el visor. Puedes compartirlo desde el gestor de archivos.');
+  } catch (e) { if (e.name !== 'AbortError') toast('No se pudo compartir el documento.'); }
+}
+function saveSelectedExcerpt() {
+  if (!state.docId) return;
+  const text = String(window.getSelection ? window.getSelection() : '').trim();
+  if (!text) { toast(state.kind === 'PDF' ? 'La selección de texto PDF no está disponible en esta versión.' : 'Selecciona primero un fragmento de texto.'); return; }
+  const items = getExcerpts(); items.unshift({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), docId: state.docId, name: $('#fname').textContent, text, created: Date.now() });
+  writeJSON('docmaster-excerpts', items.slice(0, 200)); window.getSelection().removeAllRanges(); toast('Fragmento guardado.');
+}
+function renderExcerpts() {
+  const items = getExcerpts();
+  $('#saved-list').innerHTML = items.length ? items.map(x => `<article class="excerpt"><b>${esc(x.name)}</b><p>${esc(x.text)}</p><small>${new Date(x.created).toLocaleDateString('es')}</small><button class="del" data-excerpt-del="${esc(x.id)}" aria-label="Eliminar fragmento">✕</button></article>`).join('') : '<div class="empty">Todavía no has guardado fragmentos.</div>';
+}
+function renderBookmarks() {
+  const items = state.docId ? (getMarks()[state.docId] || []) : [];
+  $('#bookmark-list').innerHTML = items.length ? items.map((m, i) => `<div class="bookmark-row"><button class="link" data-jump-mark="${i}">${esc(m.label)}</button><button class="del" data-remove-mark="${i}" aria-label="Eliminar marcador">✕</button></div>`).join('') : '<div class="empty compact">No hay marcadores para este documento.</div>';
+}
+function applyReaderPreferences() {
+  const p = readJSON('docmaster-reading-settings', { font: 17, line: 1.7, paper: 'normal' });
+  const out = $('#out'); out.style.setProperty('--reader-font', p.font + 'px'); out.style.setProperty('--reader-line', p.line);
+  out.classList.toggle('sepia', p.paper === 'sepia');
+  $('#font-size').value = p.font; $('#font-output').textContent = p.font + ' px';
+  $('#line-height').value = Math.round(p.line * 10); $('#line-output').textContent = p.line.toFixed(1); $('#paper-mode').value = p.paper;
+}
+function saveReaderPreferences() {
+  const p = { font: +$('#font-size').value, line: +$('#line-height').value / 10, paper: $('#paper-mode').value };
+  writeJSON('docmaster-reading-settings', p); applyReaderPreferences();
+}
+$('#bookmark-btn').onclick = addBookmark;
+$('#favorite-btn').onclick = toggleFavoriteCurrent;
+$('#share-btn').onclick = shareCurrentFile;
+$('#excerpt-btn').onclick = saveSelectedExcerpt;
+$('#reader-settings-btn').onclick = () => { applyReaderPreferences(); $('#reader-panel').hidden = false; };
+$('#marks-list-btn').onclick = () => { renderBookmarks(); renderExcerpts(); $('#saved-panel').hidden = false; };
+$('#panel-close').onclick = () => { $('#reader-panel').hidden = true; };
+$('#saved-close').onclick = () => { $('#saved-panel').hidden = true; };
+$('#font-size').oninput = saveReaderPreferences; $('#line-height').oninput = saveReaderPreferences; $('#paper-mode').onchange = saveReaderPreferences;
+$('#settings-reset').onclick = () => { writeJSON('docmaster-reading-settings', { font: 17, line: 1.7, paper: 'normal' }); applyReaderPreferences(); };
+$('#saved-list').onclick = e => {
+  const b = e.target.closest('[data-excerpt-del]'); if (!b) return;
+  writeJSON('docmaster-excerpts', getExcerpts().filter(x => x.id !== b.dataset.excerptDel)); renderExcerpts();
+};
+$('#bookmark-list').onclick = e => {
+  const jump = e.target.closest('[data-jump-mark]'), remove = e.target.closest('[data-remove-mark]');
+  const all = getMarks(), items = state.docId ? (all[state.docId] || []) : [];
+  if (remove) {
+    items.splice(+remove.dataset.removeMark, 1); all[state.docId] = items; writeJSON('docmaster-bookmarks', all); renderBookmarks(); syncDocButtons(); return;
+  }
+  if (jump) {
+    const mark = items[+jump.dataset.jumpMark]; if (!mark) return;
+    if (state.kind === 'PDF') { state.currentPage = mark.page || 1; document.querySelector('#pages .pw[data-n="' + state.currentPage + '"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    else if (typeof mark.percent === 'number') $('#views').scrollTop = ($('#views').scrollHeight - $('#views').clientHeight) * mark.percent / 100;
+    $('#saved-panel').hidden = true; updateProgress();
+  }
+};
+$('#reader-panel').addEventListener('click', e => { if (e.target === $('#reader-panel')) $('#reader-panel').hidden = true; });
+$('#saved-panel').addEventListener('click', e => { if (e.target === $('#saved-panel')) $('#saved-panel').hidden = true; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { $('#reader-panel').hidden = true; $('#saved-panel').hidden = true; } });
 
 /* ---------- Word ---------- */
 async function docx(buf) {
@@ -269,11 +430,24 @@ function layoutPdf() {
   if (P.obs) P.obs.disconnect();
   $('#out').innerHTML = '<div class="pages" id="pages"></div>';
   const box = $('#pages'); P.baseW = Math.max(260, $('#out').clientWidth); const W = P.baseW * P.zoom;
-  P.obs = new IntersectionObserver(es => es.forEach(e => {
-    const n = +e.target.dataset.n;
-    if (e.isIntersecting) drawPage(n);
-    else { const c = e.target.querySelector('canvas'); if (c) { c.remove(); delete e.target.dataset.z; } }
-  }), { root: $('#views'), rootMargin: '700px 0px' });
+  P.obs = new IntersectionObserver(es => {
+    es.forEach(e => {
+      const n = +e.target.dataset.n;
+      if (e.isIntersecting) drawPage(n);
+      else { const c = e.target.querySelector('canvas'); if (c) { c.remove(); delete e.target.dataset.z; } }
+    });
+    if (state.pdf === P) {
+      const vr = $('#views').getBoundingClientRect(), center = vr.top + vr.height / 2;
+      let best = null;
+      document.querySelectorAll('#pages .pw').forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.bottom <= vr.top || r.top >= vr.bottom) return;
+        const distance = Math.abs((r.top + r.bottom) / 2 - center);
+        if (!best || distance < best.distance) best = { page: +el.dataset.n, distance };
+      });
+      if (best && best.page !== state.currentPage) { state.currentPage = best.page; updateProgress(); }
+    }
+  }, { root: $('#views'), rootMargin: '700px 0px', threshold: [0, .25, .5, .75, 1] });
   P.vps.forEach((vp, i) => {
     const d = document.createElement('div'); d.className = 'pw'; d.dataset.n = i + 1;
     d.style.width = W + 'px'; d.style.aspectRatio = vp.width + ' / ' + vp.height;
@@ -399,6 +573,8 @@ $('#sbtn').onclick = () => {
 /* ---------- Botón atrás de Android ---------- */
 try {
   CapApp.addListener('backButton', () => {
+    if (!$('#saved-panel').hidden) { $('#saved-panel').hidden = true; return; }
+    if (!$('#reader-panel').hidden) { $('#reader-panel').hidden = true; return; }
     if (!$('#sbar').hidden) { closeSearch(); $('#sq').value = ''; return; }
     if (state.view === 'hist' || state.view === 'about') { showView(state.kind ? 'doc' : 'home'); return; }
     if (state.view === 'doc') { closeDoc(); return; }
@@ -460,6 +636,7 @@ let pin = null, praf = 0;
 const tdist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
 function endPinch() { if (!pin) return; pin = null; if (state.kind === 'PDF') refreshPdf(); }
 const viewsEl = $('#views');
+viewsEl.addEventListener('scroll', () => { if (state.view === 'doc' && state.kind && state.kind !== 'PDF') updateProgress(); }, { passive: true });
 viewsEl.addEventListener('touchstart', e => {
   if (state.view === 'doc' && state.kind && e.touches.length === 2) pin = { d: tdist(e.touches), z: curZoom(), zz: curZoom(), fx: 0, fy: 0 };
   else if (pin && e.touches.length !== 2) endPinch();
@@ -500,4 +677,4 @@ async function checkIncoming() {
 try { Incoming.addListener('fileOpened', checkIncoming); } catch (e) {}
 checkIncoming();
 
-renderRecent();
+renderRecent(); renderFavorites();

@@ -113,3 +113,39 @@ nav button.on{color:var(--accent);font-weight:600}
 #toast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:13.5px;opacity:0;pointer-events:none;transition:.25s;max-width:88vw;text-align:center;z-index:50}
 #toast.show{opacity:1;transform:translateX(-50%)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation-duration:.01ms!important}}
+
+/* ---------- DocMaster 2.0: lectura avanzada sin servicios externos ---------- */
+.doc-actions{display:flex;gap:6px;overflow-x:auto;padding:8px 0 5px;scrollbar-width:none}
+.doc-actions::-webkit-scrollbar{display:none}
+.doc-actions button{flex:none;padding:7px 10px;border-radius:10px;font-size:12px;white-space:nowrap}
+.doc-actions button span{font-size:12px}
+.doc-actions button:active{background:var(--accent-soft)}
+.progress-wrap{display:flex;align-items:center;gap:9px;padding:3px 1px 5px;color:var(--muted);font-size:11px}
+.progress-track{height:4px;flex:1;background:var(--line);border-radius:99px;overflow:hidden}
+#progress-fill{height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .2s ease}
+#progress-label{min-width:110px;text-align:right}
+.item .fav-toggle{width:34px;height:34px;padding:0;border:0;background:transparent;color:#d99b16;font-size:21px;flex:none}
+.item .fav-toggle:active{transform:scale(1.12)}
+.doc{font-size:var(--reader-font,17px);line-height:var(--reader-line,1.7)}
+#out.sepia .doc{background:#f3e8d1;color:#493b2a;border-color:#e3d4b8}
+#out.sepia .doc h1,#out.sepia .doc h2,#out.sepia .doc h3{color:#493b2a}
+.panel-backdrop{position:fixed;inset:0;z-index:60;background:rgba(5,12,25,.48);display:flex;align-items:flex-end;justify-content:center;padding:14px}
+.panel-backdrop[hidden]{display:none}
+.panel{width:min(100%,560px);max-height:min(82dvh,720px);overflow:auto;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 18px 60px rgba(0,0,0,.25)}
+.panel .sec{margin:0 0 14px}
+.panel-subtitle{font-size:13px;margin:16px 0 8px;color:var(--muted)}
+.setting{display:flex;flex-direction:column;gap:8px;padding:12px 0;font-size:14px}
+.setting output{color:var(--accent);font-weight:650}
+.setting input[type=range]{width:100%;accent-color:var(--accent)}
+.panel .field{margin:0}
+#settings-reset{width:100%;margin-top:12px}
+.bookmark-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;background:var(--surface2);border-radius:11px}
+.bookmark-row .link{flex:1;text-align:left}
+.bookmark-row .del{width:32px;height:32px;padding:0;border:0;background:transparent;color:var(--muted)}
+.excerpt{position:relative;padding:12px 42px 12px 12px;background:var(--surface2);border-radius:12px}
+.excerpt b{font-size:12px;color:var(--accent)}
+.excerpt p{font-size:13px;line-height:1.5;margin:7px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.excerpt small{color:var(--muted);font-size:11px}
+.excerpt .del{position:absolute;right:6px;top:6px;width:32px;height:32px;padding:0;border:0;background:transparent;color:var(--muted)}
+.empty.compact{padding:12px;font-size:12px}
+@media(max-width:390px){.doc-actions button{padding:7px 8px}.doc-actions button span{font-size:11px}.bar{gap:5px}.meta{font-size:11px}}

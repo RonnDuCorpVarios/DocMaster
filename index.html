@@ -27,6 +27,10 @@
         <div class="sec"><h2>Recientes</h2><button class="link" id="seeall">Ver todo</button></div>
         <div class="list" id="recent"></div>
       </div>
+      <div id="favorite-wrap" hidden>
+        <div class="sec"><h2>Favoritos</h2><button class="link" id="seefav">Ver todo</button></div>
+        <div class="list" id="favorites"></div>
+      </div>
     </section>
 
     <section class="view" id="v-doc">
@@ -45,13 +49,25 @@
           <button class="icon" id="sprev" aria-label="Anterior">↑</button>
           <button class="icon" id="snext" aria-label="Siguiente">↓</button>
         </div>
+        <div class="doc-actions" id="doc-actions" hidden>
+          <button id="bookmark-btn" title="Guardar marcador">◇ <span>Marcador</span></button>
+          <button id="marks-list-btn" title="Ver marcadores y textos guardados">▣ <span>Guardados</span></button>
+          <button id="favorite-btn" title="Añadir a favoritos">☆ <span>Favorito</span></button>
+          <button id="share-btn" title="Compartir documento">↗ <span>Compartir</span></button>
+          <button id="excerpt-btn" title="Guardar texto seleccionado">▤ <span>Guardar texto</span></button>
+          <button id="reader-settings-btn" title="Ajustes de lectura">Aa <span>Lectura</span></button>
+        </div>
+        <div class="progress-wrap" id="progress-wrap" hidden>
+          <div class="progress-track"><div id="progress-fill"></div></div>
+          <span id="progress-label">0%</span>
+        </div>
       </div>
       <div id="load" hidden><div class="spin"></div><span id="loadtxt">Abriendo…</span></div>
       <div id="out"></div>
     </section>
 
     <section class="view" id="v-hist">
-      <div class="sec"><h2>Historial</h2><button class="link" id="clearh">Borrar todo</button></div>
+      <div class="sec"><h2 id="history-title">Historial</h2><div><button class="link" id="show-history">Historial</button><button class="link" id="show-favorites">Favoritos</button><button class="link" id="clearh">Borrar todo</button></div></div>
       <input id="hq" class="field" type="search" placeholder="Buscar por nombre…" autocomplete="off">
       <div class="list" id="hlist"></div>
     </section>
@@ -73,9 +89,28 @@
     </section>
   </main>
 
+  <div class="panel-backdrop" id="reader-panel" hidden>
+    <section class="panel" role="dialog" aria-modal="true" aria-labelledby="panel-title">
+      <div class="sec"><h2 id="panel-title">Ajustes de lectura</h2><button class="icon" id="panel-close" aria-label="Cerrar">✕</button></div>
+      <label class="setting">Tamaño del texto <output id="font-output">17 px</output><input id="font-size" type="range" min="13" max="25" value="17"></label>
+      <label class="setting">Interlineado <output id="line-output">1.7</output><input id="line-height" type="range" min="13" max="22" value="17"></label>
+      <label class="setting">Estilo de página<select id="paper-mode" class="field"><option value="normal">Normal</option><option value="sepia">Sepia</option></select></label>
+      <button class="primary" id="settings-reset">Restablecer lectura</button>
+    </section>
+  </div>
+  <div class="panel-backdrop" id="saved-panel" hidden>
+    <section class="panel" role="dialog" aria-modal="true" aria-labelledby="saved-title">
+      <div class="sec"><h2 id="saved-title">Guardados</h2><button class="icon" id="saved-close" aria-label="Cerrar">✕</button></div>
+      <h3 class="panel-subtitle">Marcadores de este documento</h3>
+      <div id="bookmark-list" class="list"></div>
+      <h3 class="panel-subtitle">Fragmentos guardados</h3>
+      <div id="saved-list" class="list"></div>
+    </section>
+  </div>
+
   <nav>
     <button id="n-read" class="on"><span>▤</span>Lector</button>
-    <button id="n-hist"><span>◷</span>Historial</button>
+    <button id="n-hist"><span>◷</span>Biblioteca</button>
     <button id="n-about"><span>ⓘ</span>Acerca de</button>
   </nav>
   <div id="toast"></div>
